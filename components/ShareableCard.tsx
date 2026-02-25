@@ -7,13 +7,14 @@ interface ShareableCardProps {
   title: string;
   subtitle?: string;
   theme?: 'dark' | 'light' | 'gradient';
+  width?: number;
 }
 
-export function ShareableCard({ children, title, subtitle, theme = 'dark' }: ShareableCardProps) {
+export function ShareableCard({ children, title, subtitle, theme = 'dark', width = 360 }: ShareableCardProps) {
   const colors = THEMES[theme];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background, width }]}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logo}>
@@ -69,7 +70,6 @@ export const SHARE_THEMES = THEMES;
 
 const styles = StyleSheet.create({
   container: {
-    width: 360,
     padding: 24,
     borderRadius: 24,
   },

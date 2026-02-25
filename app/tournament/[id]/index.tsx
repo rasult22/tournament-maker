@@ -21,6 +21,7 @@ import {
 } from '../../../utils/tournament';
 import { ShareModal } from '../../../components/share/ShareModal';
 import { StandingsShare } from '../../../components/share/StandingsShare';
+import { BracketShare } from '../../../components/share/BracketShare';
 import { TournamentBracket } from '../../../components/TournamentBracket';
 import { TeamBadge } from '../../../components/TeamBadge';
 import { getTeamById } from '../../../data/teams';
@@ -130,11 +131,11 @@ export default function TournamentScreen() {
       <Stack.Screen
         options={{
           title: tournament.name,
-          headerRight: () => showTable ? (
+          headerRight: () => (
             <TouchableOpacity onPress={() => setShowShareModal(true)} style={{ marginRight: 8 }}>
               <Ionicons name="share-outline" size={24} color={colors.tint} />
             </TouchableOpacity>
-          ) : null,
+          ),
         }}
       />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -384,13 +385,26 @@ export default function TournamentScreen() {
         <ShareModal
           visible={showShareModal}
           onClose={() => setShowShareModal(false)}
-          renderContent={(theme) => (
-            <StandingsShare
-              tournamentName={tournament.name}
-              standings={standings}
-              theme={theme}
-            />
-          )}
+          renderContent={(theme) => {
+            if (tournament.type === 'playoff') {
+              return (
+                <BracketShare
+                  tournamentName={tournament.name}
+                  matches={tournament.matches}
+                  players={tournament.players}
+                  winner={winner || undefined}
+                  theme={theme}
+                />
+              );
+            }
+            return (
+              <StandingsShare
+                tournamentName={tournament.name}
+                standings={standings}
+                theme={theme}
+              />
+            );
+          }}
         />
       </View>
     </>
