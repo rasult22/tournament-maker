@@ -2,6 +2,7 @@ export interface Player {
   id: string;
   name: string;
   avatar?: string;
+  teamId?: string; // ID команды из data/teams.ts
 }
 
 export type TournamentType = 'league' | 'playoff' | 'league_playoff';

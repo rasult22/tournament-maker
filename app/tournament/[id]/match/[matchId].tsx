@@ -13,6 +13,8 @@ import { useColors } from '../../../../hooks/useColors';
 import { Tournament, Match } from '../../../../types';
 import { getTournamentById, saveTournament } from '../../../../storage/tournaments';
 import { updatePlayoffBracket } from '../../../../utils/tournament';
+import { TeamBadge } from '../../../../components/TeamBadge';
+import { getTeamById } from '../../../../data/teams';
 
 export default function MatchScreen() {
   const { id, matchId } = useLocalSearchParams<{ id: string; matchId: string }>();
@@ -104,15 +106,27 @@ export default function MatchScreen() {
 
   const player1 = tournament.players.find(p => p.id === match.player1Id);
   const player2 = tournament.players.find(p => p.id === match.player2Id);
+  const team1 = player1?.teamId ? getTeamById(player1.teamId) : undefined;
+  const team2 = player2?.teamId ? getTeamById(player2.teamId) : undefined;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         {/* Player 1 */}
         <View style={styles.playerSection}>
+          {team1 && (
+            <View style={styles.teamBadgeContainer}>
+              <TeamBadge team={team1} size="large" />
+            </View>
+          )}
           <Text style={[styles.playerName, { color: colors.text }]}>
             {player1?.name || 'Игрок 1'}
           </Text>
+          {team1 && (
+            <Text style={[styles.teamName, { color: colors.textSecondary }]}>
+              {team1.name}
+            </Text>
+          )}
           <View style={styles.scoreControls}>
             <TouchableOpacity
               style={[styles.scoreButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
@@ -139,9 +153,19 @@ export default function MatchScreen() {
 
         {/* Player 2 */}
         <View style={styles.playerSection}>
+          {team2 && (
+            <View style={styles.teamBadgeContainer}>
+              <TeamBadge team={team2} size="large" />
+            </View>
+          )}
           <Text style={[styles.playerName, { color: colors.text }]}>
             {player2?.name || 'Игрок 2'}
           </Text>
+          {team2 && (
+            <Text style={[styles.teamName, { color: colors.textSecondary }]}>
+              {team2.name}
+            </Text>
+          )}
           <View style={styles.scoreControls}>
             <TouchableOpacity
               style={[styles.scoreButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
@@ -205,10 +229,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 24,
   },
+  teamBadgeContainer: {
+    marginBottom: 12,
+  },
   playerName: {
     fontSize: 24,
     fontWeight: '700',
-    marginBottom: 24,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  teamName: {
+    fontSize: 14,
+    marginBottom: 20,
     textAlign: 'center',
   },
   scoreControls: {

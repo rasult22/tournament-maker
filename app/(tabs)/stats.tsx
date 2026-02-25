@@ -1,15 +1,18 @@
 import { useCallback, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../../hooks/useColors';
 import { getTournaments } from '../../storage/tournaments';
 import { calculateGlobalStats, GlobalPlayerStats } from '../../utils/stats';
+import { ShareModal } from '../../components/share/ShareModal';
+import { PlayerStatsShare } from '../../components/share/PlayerStatsShare';
 
 export default function StatsScreen() {
   const colors = useColors();
   const [stats, setStats] = useState<GlobalPlayerStats[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<{ stats: GlobalPlayerStats; rank: number } | null>(null);
 
   const loadStats = useCallback(async () => {
     const tournaments = await getTournaments();
@@ -31,9 +34,14 @@ export default function StatsScreen() {
 
   const renderPlayer = ({ item, index }: { item: GlobalPlayerStats; index: number }) => {
     const isTop3 = index < 3;
+    const rank = index + 1;
 
     return (
-      <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <TouchableOpacity
+        style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onPress={() => setSelectedPlayer({ stats: item, rank })}
+        activeOpacity={0.7}
+      >
         <View style={styles.positionContainer}>
           {isTop3 ? (
             <Ionicons
@@ -75,7 +83,8 @@ export default function StatsScreen() {
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>WR</Text>
           </View>
         </View>
-      </View>
+        <Ionicons name="share-outline" size={18} color={colors.textSecondary} style={{ marginLeft: 8 }} />
+      </TouchableOpacity>
     );
   };
 
@@ -111,6 +120,21 @@ export default function StatsScreen() {
           ) : null
         }
       />
+
+      {/* Share Modal */}
+      {selectedPlayer && (
+        <ShareModal
+          visible={!!selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+          renderContent={(theme) => (
+            <PlayerStatsShare
+              stats={selectedPlayer.stats}
+              rank={selectedPlayer.rank}
+              theme={theme}
+            />
+          )}
+        />
+      )}
     </View>
   );
 }

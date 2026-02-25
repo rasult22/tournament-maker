@@ -11,7 +11,7 @@ import {
 import { useLocalSearchParams, router, useFocusEffect, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../../../hooks/useColors';
-import { Tournament, Match, StandingsRow } from '../../../types';
+import { Tournament } from '../../../types';
 import { getTournamentById, saveTournament } from '../../../storage/tournaments';
 import {
   calculateStandings,
@@ -19,6 +19,11 @@ import {
   checkTournamentCompletion,
   getTournamentWinner,
 } from '../../../utils/tournament';
+import { ShareModal } from '../../../components/share/ShareModal';
+import { StandingsShare } from '../../../components/share/StandingsShare';
+import { TournamentBracket } from '../../../components/TournamentBracket';
+import { TeamBadge } from '../../../components/TeamBadge';
+import { getTeamById } from '../../../data/teams';
 
 export default function TournamentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,6 +31,7 @@ export default function TournamentScreen() {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'table' | 'matches' | 'bracket'>('table');
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const loadTournament = useCallback(async () => {
     if (!id) return;
@@ -80,6 +86,7 @@ export default function TournamentScreen() {
           const updated = { ...tournament, status: 'finished' as const };
           await saveTournament(updated);
           setTournament(updated);
+          setShowShareModal(true);
         },
       },
     ]);
@@ -106,23 +113,12 @@ export default function TournamentScreen() {
     return tournament.players.find(p => p.id === playerId)?.name || 'Unknown';
   };
 
-  // Группируем матчи по раундам для плей-офф
-  const matchesByRound = tournament.matches.reduce((acc, match) => {
-    const round = match.round;
-    if (!acc[round]) acc[round] = [];
-    acc[round].push(match);
-    return acc;
-  }, {} as Record<number, Match[]>);
-
-  const rounds = Object.keys(matchesByRound).map(Number).sort((a, b) => a - b);
-  const maxRound = Math.max(...rounds);
-
-  const getRoundName = (round: number) => {
-    const matchesInRound = matchesByRound[round]?.length || 0;
-    if (matchesInRound === 1) return 'Финал';
-    if (matchesInRound === 2) return 'Полуфинал';
-    if (matchesInRound === 4) return 'Четвертьфинал';
-    return `Раунд ${round}`;
+  const getPlayerTeam = (playerId: string) => {
+    const player = tournament.players.find(p => p.id === playerId);
+    if (player?.teamId) {
+      return getTeamById(player.teamId);
+    }
+    return undefined;
   };
 
   const pendingMatches = tournament.matches.filter(
@@ -131,7 +127,16 @@ export default function TournamentScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: tournament.name }} />
+      <Stack.Screen
+        options={{
+          title: tournament.name,
+          headerRight: () => showTable ? (
+            <TouchableOpacity onPress={() => setShowShareModal(true)} style={{ marginRight: 8 }}>
+              <Ionicons name="share-outline" size={24} color={colors.tint} />
+            </TouchableOpacity>
+          ) : null,
+        }}
+      />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Winner Banner */}
         {tournament.status === 'finished' && winner && (
@@ -248,9 +253,31 @@ export default function TournamentScreen() {
                       onPress={() => router.push(`/tournament/${id}/match/${match.id}`)}
                     >
                       <View style={styles.matchPlayers}>
-                        <Text style={[styles.matchPlayer, { color: colors.text }]}>{getPlayerName(match.player1Id)}</Text>
+                        {(() => {
+                          const team1 = getPlayerTeam(match.player1Id);
+                          return (
+                            <View style={styles.matchPlayerInfo}>
+                              {team1 && <TeamBadge team={team1} size="small" />}
+                              <View>
+                                <Text style={[styles.matchPlayer, { color: colors.text }]}>{getPlayerName(match.player1Id)}</Text>
+                                {team1 && <Text style={[styles.matchTeamName, { color: colors.textSecondary }]}>{team1.shortName}</Text>}
+                              </View>
+                            </View>
+                          );
+                        })()}
                         <Text style={[styles.matchVs, { color: colors.textSecondary }]}>vs</Text>
-                        <Text style={[styles.matchPlayer, { color: colors.text }]}>{getPlayerName(match.player2Id)}</Text>
+                        {(() => {
+                          const team2 = getPlayerTeam(match.player2Id);
+                          return (
+                            <View style={[styles.matchPlayerInfo, styles.matchPlayerInfoRight]}>
+                              <View style={styles.matchPlayerTextRight}>
+                                <Text style={[styles.matchPlayer, { color: colors.text }]}>{getPlayerName(match.player2Id)}</Text>
+                                {team2 && <Text style={[styles.matchTeamName, { color: colors.textSecondary }]}>{team2.shortName}</Text>}
+                              </View>
+                              {team2 && <TeamBadge team={team2} size="small" />}
+                            </View>
+                          );
+                        })()}
                       </View>
                       <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
@@ -269,23 +296,45 @@ export default function TournamentScreen() {
                         style={[styles.matchCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                       >
                         <View style={styles.matchPlayers}>
-                          <Text style={[
-                            styles.matchPlayer,
-                            { color: match.score1! > match.score2! ? colors.text : colors.textSecondary },
-                            match.score1! > match.score2! && styles.matchWinner,
-                          ]}>
-                            {getPlayerName(match.player1Id)}
-                          </Text>
+                          {(() => {
+                            const team1 = getPlayerTeam(match.player1Id);
+                            return (
+                              <View style={styles.matchPlayerInfo}>
+                                {team1 && <TeamBadge team={team1} size="small" />}
+                                <View>
+                                  <Text style={[
+                                    styles.matchPlayer,
+                                    { color: match.score1! > match.score2! ? colors.text : colors.textSecondary },
+                                    match.score1! > match.score2! && styles.matchWinner,
+                                  ]}>
+                                    {getPlayerName(match.player1Id)}
+                                  </Text>
+                                  {team1 && <Text style={[styles.matchTeamName, { color: colors.textSecondary }]}>{team1.shortName}</Text>}
+                                </View>
+                              </View>
+                            );
+                          })()}
                           <Text style={[styles.matchScore, { color: colors.text }]}>
                             {match.score1} - {match.score2}
                           </Text>
-                          <Text style={[
-                            styles.matchPlayer,
-                            { color: match.score2! > match.score1! ? colors.text : colors.textSecondary },
-                            match.score2! > match.score1! && styles.matchWinner,
-                          ]}>
-                            {getPlayerName(match.player2Id)}
-                          </Text>
+                          {(() => {
+                            const team2 = getPlayerTeam(match.player2Id);
+                            return (
+                              <View style={[styles.matchPlayerInfo, styles.matchPlayerInfoRight]}>
+                                <View style={styles.matchPlayerTextRight}>
+                                  <Text style={[
+                                    styles.matchPlayer,
+                                    { color: match.score2! > match.score1! ? colors.text : colors.textSecondary },
+                                    match.score2! > match.score1! && styles.matchWinner,
+                                  ]}>
+                                    {getPlayerName(match.player2Id)}
+                                  </Text>
+                                  {team2 && <Text style={[styles.matchTeamName, { color: colors.textSecondary }]}>{team2.shortName}</Text>}
+                                </View>
+                                {team2 && <TeamBadge team={team2} size="small" />}
+                              </View>
+                            );
+                          })()}
                         </View>
                       </View>
                     ))}
@@ -296,62 +345,16 @@ export default function TournamentScreen() {
 
           {/* Bracket View */}
           {activeTab === 'bracket' && showBracket && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.bracketContainer}>
-                {rounds.map(round => (
-                  <View key={round} style={styles.bracketRound}>
-                    <Text style={[styles.roundTitle, { color: colors.textSecondary }]}>
-                      {getRoundName(round)}
-                    </Text>
-                    <View style={styles.bracketMatches}>
-                      {matchesByRound[round].map(match => {
-                        const canPlay = match.status === 'pending' &&
-                          match.player1Id !== 'tbd' &&
-                          match.player2Id !== 'tbd' &&
-                          match.player1Id !== 'bye';
-
-                        return (
-                          <TouchableOpacity
-                            key={match.id}
-                            style={[
-                              styles.bracketMatch,
-                              { backgroundColor: colors.card, borderColor: colors.border },
-                              match.status === 'finished' && { borderColor: colors.tint },
-                            ]}
-                            onPress={() => canPlay && router.push(`/tournament/${id}/match/${match.id}`)}
-                            disabled={!canPlay}
-                          >
-                            <View style={[
-                              styles.bracketPlayer,
-                              match.status === 'finished' && match.score1! > match.score2! && { backgroundColor: colors.tint + '20' },
-                            ]}>
-                              <Text style={[styles.bracketPlayerName, { color: colors.text }]} numberOfLines={1}>
-                                {getPlayerName(match.player1Id)}
-                              </Text>
-                              {match.status === 'finished' && (
-                                <Text style={[styles.bracketScore, { color: colors.text }]}>{match.score1}</Text>
-                              )}
-                            </View>
-                            <View style={[styles.bracketDivider, { backgroundColor: colors.border }]} />
-                            <View style={[
-                              styles.bracketPlayer,
-                              match.status === 'finished' && match.score2! > match.score1! && { backgroundColor: colors.tint + '20' },
-                            ]}>
-                              <Text style={[styles.bracketPlayerName, { color: colors.text }]} numberOfLines={1}>
-                                {getPlayerName(match.player2Id)}
-                              </Text>
-                              {match.status === 'finished' && (
-                                <Text style={[styles.bracketScore, { color: colors.text }]}>{match.score2}</Text>
-                              )}
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </ScrollView>
+            <TournamentBracket
+              matches={tournament.matches.filter(m =>
+                tournament.type === 'playoff' ||
+                (tournament.type === 'league_playoff' && tournament.phase === 'playoff' && m.round > 0)
+              )}
+              players={tournament.players}
+              getPlayerName={getPlayerName}
+              onMatchPress={(matchId) => router.push(`/tournament/${id}/match/${matchId}`)}
+              colors={colors}
+            />
           )}
         </ScrollView>
 
@@ -376,6 +379,19 @@ export default function TournamentScreen() {
             )}
           </View>
         )}
+
+        {/* Share Modal */}
+        <ShareModal
+          visible={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          renderContent={(theme) => (
+            <StandingsShare
+              tournamentName={tournament.name}
+              standings={standings}
+              theme={theme}
+            />
+          )}
+        />
       </View>
     </>
   );
@@ -491,9 +507,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  matchPlayerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
+  },
+  matchPlayerInfoRight: {
+    justifyContent: 'flex-end',
+  },
+  matchPlayerTextRight: {
+    alignItems: 'flex-end',
+  },
   matchPlayer: {
     fontSize: 15,
-    flex: 1,
+  },
+  matchTeamName: {
+    fontSize: 11,
+    marginTop: 2,
   },
   matchWinner: {
     fontWeight: '600',
@@ -506,46 +537,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     marginHorizontal: 12,
-  },
-  bracketContainer: {
-    flexDirection: 'row',
-    gap: 16,
-    paddingRight: 16,
-  },
-  bracketRound: {
-    width: 160,
-  },
-  roundTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  bracketMatches: {
-    gap: 16,
-  },
-  bracketMatch: {
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  bracketPlayer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 10,
-  },
-  bracketPlayerName: {
-    fontSize: 13,
-    flex: 1,
-  },
-  bracketScore: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  bracketDivider: {
-    height: 1,
   },
   footer: {
     position: 'absolute',

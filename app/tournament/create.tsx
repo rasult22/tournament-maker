@@ -17,6 +17,9 @@ import { TournamentType, Player, Tournament } from '../../types';
 import { saveTournament } from '../../storage/tournaments';
 import { generateId } from '../../utils/generateId';
 import { generateLeagueMatches, generatePlayoffMatches } from '../../utils/tournament';
+import { TeamPicker } from '../../components/TeamPicker';
+import { TeamBadge } from '../../components/TeamBadge';
+import { Team, getTeamById } from '../../data/teams';
 
 const TOURNAMENT_TYPES: { value: TournamentType; label: string; description: string }[] = [
   { value: 'league', label: 'Лига', description: 'Все играют со всеми' },
@@ -31,6 +34,8 @@ export default function CreateTournamentScreen() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [playoffQualifiers, setPlayoffQualifiers] = useState(4);
+  const [showTeamPicker, setShowTeamPicker] = useState(false);
+  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
 
   const addPlayer = () => {
     const trimmedName = newPlayerName.trim();
@@ -47,6 +52,24 @@ export default function CreateTournamentScreen() {
 
   const removePlayer = (id: string) => {
     setPlayers(players.filter(p => p.id !== id));
+  };
+
+  const openTeamPicker = (playerId: string) => {
+    setEditingPlayerId(playerId);
+    setShowTeamPicker(true);
+  };
+
+  const handleTeamSelect = (team: Team) => {
+    if (!editingPlayerId) return;
+    setPlayers(players.map(p =>
+      p.id === editingPlayerId ? { ...p, teamId: team.id } : p
+    ));
+    setEditingPlayerId(null);
+  };
+
+  const getPlayerTeam = (teamId?: string): Team | undefined => {
+    if (!teamId) return undefined;
+    return getTeamById(teamId);
   };
 
   const validateAndCreate = async () => {
@@ -177,20 +200,61 @@ export default function CreateTournamentScreen() {
         </View>
 
         <View style={styles.playersList}>
-          {players.map((player, index) => (
-            <View
-              key={player.id}
-              style={[styles.playerRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-            >
-              <Text style={[styles.playerIndex, { color: colors.textSecondary }]}>{index + 1}</Text>
-              <Text style={[styles.playerName, { color: colors.text }]}>{player.name}</Text>
-              <TouchableOpacity onPress={() => removePlayer(player.id)}>
-                <Ionicons name="close-circle" size={24} color={colors.error} />
-              </TouchableOpacity>
-            </View>
-          ))}
+          {players.map((player, index) => {
+            const team = getPlayerTeam(player.teamId);
+            return (
+              <View
+                key={player.id}
+                style={[styles.playerRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+              >
+                <Text style={[styles.playerIndex, { color: colors.textSecondary }]}>{index + 1}</Text>
+
+                {/* Team badge or placeholder */}
+                <TouchableOpacity
+                  style={styles.teamBadgeContainer}
+                  onPress={() => openTeamPicker(player.id)}
+                >
+                  {team ? (
+                    <TeamBadge team={team} size="small" />
+                  ) : (
+                    <View style={[styles.teamPlaceholder, { backgroundColor: colors.border }]}>
+                      <Ionicons name="shirt-outline" size={16} color={colors.textSecondary} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <View style={styles.playerInfo}>
+                  <Text style={[styles.playerName, { color: colors.text }]}>{player.name}</Text>
+                  {team && (
+                    <Text style={[styles.teamName, { color: colors.textSecondary }]}>{team.shortName}</Text>
+                  )}
+                </View>
+
+                <TouchableOpacity onPress={() => removePlayer(player.id)}>
+                  <Ionicons name="close-circle" size={24} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+            );
+          })}
         </View>
+
+        {players.length > 0 && (
+          <Text style={[styles.hint, { color: colors.textSecondary }]}>
+            Нажмите на иконку футболки, чтобы выбрать команду
+          </Text>
+        )}
       </ScrollView>
+
+      {/* Team Picker Modal */}
+      <TeamPicker
+        visible={showTeamPicker}
+        onClose={() => {
+          setShowTeamPicker(false);
+          setEditingPlayerId(null);
+        }}
+        onSelect={handleTeamSelect}
+        selectedTeamId={editingPlayerId ? players.find(p => p.id === editingPlayerId)?.teamId : undefined}
+      />
 
       <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
         <TouchableOpacity
@@ -291,9 +355,30 @@ const createStyles = (colors: ReturnType<typeof useColors>) =>
       fontSize: 14,
       fontWeight: '500',
     },
-    playerName: {
+    teamBadgeContainer: {
+      marginRight: 10,
+    },
+    teamPlaceholder: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    playerInfo: {
       flex: 1,
+    },
+    playerName: {
       fontSize: 16,
+    },
+    teamName: {
+      fontSize: 12,
+      marginTop: 2,
+    },
+    hint: {
+      fontSize: 12,
+      textAlign: 'center',
+      marginTop: 12,
     },
     footer: {
       position: 'absolute',

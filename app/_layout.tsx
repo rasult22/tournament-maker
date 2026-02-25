@@ -1,15 +1,34 @@
+import { useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, SplashScreen } from "expo-router";
 import { StatusBar, useColorScheme } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useFonts } from "expo-font";
+import { Ionicons } from "@expo/vector-icons";
 import queryClient from "../queries/index";
 import { Colors } from "../constants/colors";
+
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === "dark";
   const colors = Colors[isDarkMode ? "dark" : "light"];
+
+  const [fontsLoaded] = useFonts({
+    ...Ionicons.font,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
